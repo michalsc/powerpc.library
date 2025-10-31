@@ -10,7 +10,7 @@ SECTIONS
 {
     .text :
     {
-        _code_start = .;
+        _rom_start = .;
 
         /* Everything from main.c will be copied to ram together with DiagArea */
         *main.c.o(.text .text.* .rodata .rodata.*)
