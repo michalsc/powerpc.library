@@ -11,7 +11,11 @@
 
 struct PrivatePPCBase {
     struct PPCBase      pp_Public;
+    
+    /* Task management */
     struct TaskPPC *    pp_ThisPPCProc;
+    struct List         pp_PPCTaskReady;
+    struct List         pp_PPCTaskWait;
 
     /* Two doorbells used for communication - subject of change in future */
     doorbell_t          M68k_to_PPC;
@@ -19,11 +23,14 @@ struct PrivatePPCBase {
 
     /* Placeholder for NULL-Task context */
     APTR                pp_iFrame;
+    ULONG               pp_pvr;
 
     /* Task waiting for a signal */
     struct Task *       pp_WaitingTask;
     UBYTE               pp_WaitingTaskBit;
 
+    /* main process */
+    struct Process *    pp_PPCProcess;
 };
 
 #define LIB_POSSIZE             sizeof(struct PrivatePPCBase)

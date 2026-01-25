@@ -15,6 +15,8 @@ target_include_directories(powerpc INTERFACE include)
 add_executable(powerpc.library
     src/main.c
     src/init.c
+    src/support.c
+    src/process.c
 )
 
 bin_to_header(powerpc.library)
@@ -23,6 +25,6 @@ target_link_options(powerpc.library PRIVATE -m68040 -ffreestanding -nostdlib -no
 target_compile_options(powerpc.library PRIVATE -Os -m68040 -fomit-frame-pointer)
 target_compile_definitions(powerpc.library PRIVATE VERSION_STRING="${VERSTRING}")
 target_include_directories(powerpc.library PRIVATE include)
-target_link_libraries(powerpc.library devicetree)
+target_link_libraries(powerpc.library devicetree amiga)
 
 set_target_properties(powerpc.library PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/ldscript.lds)

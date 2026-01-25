@@ -15,13 +15,17 @@
 #include "libstructs.h"
 #include "powerpc.h"
 #include "powerpc_private.h"
+#include "support.h"
+#include "process.h"
 
 #define RESERVED_PPC    (APTR)0xcafebabe
 
 static void putch(REGARG(UBYTE data, "d0"), REGARG(APTR ignore, "a3"))
 {
     (void)ignore;
+
     *(UBYTE*)0xdeadbeef = data;
+    asm volatile("move.l 4.w, a6; jsr -516(a6)"::"d"(data):"a6");
 }
 
 void kprintf(REGARG(const char * msg, "a0"), REGARG(void * args, "a1")) 
@@ -349,9 +353,11 @@ int OnInterrupt(REGARG(struct PrivatePPCBase *PPCBase, "a1"))
     ULONG tmp;
 
     asm volatile("movec #0x1e0, %0":"=r"(tmp));
-    
+
     if (tmp & 0x40000000)
     {
+        bug("[PPC.m68k] OnInterrupt called, SRQ=%08lx\n", tmp);
+
         struct XMessage *m = StartRecievingMessage(PPCBase);
 
         switch(m->id) {
@@ -446,6 +452,8 @@ APTR Init(REGARG(struct ExecBase *SysBase, "a6"))
 
         AddIntServer(INTB_PORTS, inter);
 
+        start_powerpc_proc(PPCBase);
+#if 0
         PPCBase->pp_WaitingTask = SysBase->ThisTask;
         PPCBase->pp_WaitingTaskBit = SIGB_SINGLE;
 
@@ -478,7 +486,9 @@ APTR Init(REGARG(struct ExecBase *SysBase, "a6"))
             Here, since the powerpc.library can come from Emu68 rom, the DOS might not be initialized yet.
             In that case we will need to postpone this process for later
         */
-        
+        //start_powerpc_proc(PPCBase);
+        #endif
+        #if 0
         PPCBase->pp_Public.PPC_DosLib = OpenLibrary("dos.library", 0);
 
         if (PPCBase->pp_Public.PPC_DosLib == NULL) {
@@ -490,6 +500,7 @@ APTR Init(REGARG(struct ExecBase *SysBase, "a6"))
 
         //SendPacketMessage(PPCBase, &msg_cause);
 
+        #endif
         /*
             powerpc.library on Emu68 is in rom, SegList = 0 in that case
         */
