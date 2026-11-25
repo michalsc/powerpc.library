@@ -1,7 +1,10 @@
 #ifndef _LIBSTRUCTS_H
 #define _LIBSTRUCTS_H
 
+#include "config.h"
+
 #include <exec/types.h>
+#include <dos/dos.h>
 #include <powerpc/powerpc.h>
 #include <powerpc/tasksPPC.h>
 
@@ -25,7 +28,6 @@ struct DebugArgs {
     ULONG               db_Function;
     ULONG               db_Arg[4];
 };
-
 
 struct SysCall {
     ULONG               sc_Function;

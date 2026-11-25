@@ -5,8 +5,9 @@
 #include <proto/exec.h>
 #include <proto/utility.h>
 #include <clib/alib_protos.h>
+#include <stddef.h>
 
-int _strlen(CONST_STRPTR str)
+size_t strlen(const char * str)
 {
     int len = 0;
 
@@ -24,7 +25,7 @@ struct Task * NewCreateTaskTags(struct TagItem *tags)
     APTR entry = (APTR)GetTagData(TASKTAG_PC, 0, tags);
     APTR task_name = (APTR)GetTagData(TASKTAG_NAME, (ULONG)"task", tags);
     APTR userdata = (APTR)GetTagData(TASKTAG_USERDATA, 0, tags);
-    ULONG task_name_len = _strlen(task_name) + 1;
+    ULONG task_name_len = strlen(task_name) + 1;
     UBYTE priority = GetTagData(TASKTAG_PRI, 0, tags);
     ULONG stacksize = GetTagData(TASKTAG_STACKSIZE, 8192, tags);
     ULONG args[] = {
