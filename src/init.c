@@ -17,6 +17,7 @@
 #include "powerpc_private.h"
 #include "support.h"
 #include "process.h"
+#include "constants.h"
 
 #define RESERVED_PPC    (APTR)0xcafebabe
 
@@ -25,7 +26,9 @@ static void putch(REGARG(UBYTE data, "d0"), REGARG(APTR ignore, "a3"))
     (void)ignore;
 
     *(UBYTE*)0xdeadbeef = data;
+#if USE_RAWPUTCHAR
     asm volatile("move.l 4.w, a6; jsr -516(a6)"::"d"(data):"a6");
+#endif
 }
 
 void kprintf(REGARG(const char * msg, "a0"), REGARG(void * args, "a1")) 
@@ -142,7 +145,7 @@ void L_FreeXMsg(REGARG(struct Message * msg, "a0"), REGARG(struct PrivatePPCBase
 
 ULONG L_GetCPU()
 {
-    return CPUF_G3;
+    return CPUF_EMU68;
 }
 
 static const APTR relFuncTable[TOTAL_FUNCS + 1] =
@@ -309,79 +312,6 @@ static const APTR relFuncTable[TOTAL_FUNCS + 1] =
 extern const char deviceName[];
 extern const char deviceIdString[];
 
-extern ULONG interruptPPC();
-asm(".text\n_interruptPPC: move.l d0,-(a7);movec #0x1e0, d0; ori.l #0x80000000, d0; movec d0, #0x1e0; move.l (a7)+,d0; rte ");
-
-void SendPacketMessage(struct PrivatePPCBase * PPCBase, APTR message)
-{
-    struct ExecBase *SysBase = PPCBase->pp_Public.PPC_SysLib;
-    ULONG reg;
-
-    /* Send message */
-    doorbell_send(&PPCBase->M68k_to_PPC, STATUS_MSG);
-    
-    /* Fire interrupt */
-    Supervisor(&interruptPPC);
-
-    /* Wait for ACK */
-    while(doorbell_wait(&PPCBase->PPC_to_M68k) != STATUS_ACK);
-
-    /* Send message address */
-    doorbell_send(&PPCBase->M68k_to_PPC, (ULONG)message);
-
-    /* Wait for ACK */
-    while(doorbell_wait(&PPCBase->PPC_to_M68k) != STATUS_ACK);
-}
-
-APTR StartRecievingMessage(struct PrivatePPCBase * PPCBase)
-{
-    while(doorbell_wait(&PPCBase->PPC_to_M68k) != STATUS_MSG);
-
-    doorbell_send(&PPCBase->M68k_to_PPC, STATUS_ACK);
-
-    return (APTR)doorbell_wait(&PPCBase->PPC_to_M68k);
-}
-
-void EndReceivingMessage(struct PrivatePPCBase * PPCBase)
-{
-    doorbell_send(&PPCBase->M68k_to_PPC, STATUS_ACK);
-}
-
-int OnInterrupt(REGARG(struct PrivatePPCBase *PPCBase, "a1"))
-{
-    struct ExecBase *SysBase = PPCBase->pp_Public.PPC_SysLib;
-    ULONG tmp;
-
-    asm volatile("movec #0x1e0, %0":"=r"(tmp));
-
-    if (tmp & 0x40000000)
-    {
-        bug("[PPC.m68k] OnInterrupt called, SRQ=%08lx\n", tmp);
-
-        struct XMessage *m = StartRecievingMessage(PPCBase);
-
-        switch(m->id) {
-            case XMSG_SIGNAL_TASK:
-                bug("[PPC.m68k] Signalling task %lx with sigset %lx\n", (ULONG)m->SignalTask.task, m->SignalTask.sigset);
-                Signal(m->SignalTask.task, m->SignalTask.sigset);
-                break;
-            default:
-                bug("[PPC.m68k] no idea what to do with XMessage %ld\n", m->id);
-                break;
-        }
-
-        EndReceivingMessage(PPCBase);
-
-        /* Clear the bits used to signal interrupts */
-        tmp &= 0x1fffffff;
-
-        /* ACK the interrupt from PPC */
-        asm volatile("movec %0, #0x1e0"::"r"(tmp | 0x40000000));
-        return 1;
-    }
-    return 0;
-}
-
 extern void trampoline();
 asm(".text\n_trampoline: bsr.w _OnInterrupt\n\tcmp #0, d0\n\trts");
 
@@ -423,13 +353,15 @@ APTR Init(REGARG(struct ExecBase *SysBase, "a6"))
     ExpansionBase = (struct ExpansionBase *)OpenLibrary("expansion.library", 0);
     GetCurrentBinding(&binding, sizeof(binding));
 
-    base_pointer = AllocMem(LIB_NEGSIZE + LIB_POSSIZE, MEMF_PUBLIC | MEMF_CLEAR);
+    base_pointer = AllocMem(LIB_NEGSIZE + LIB_POSSIZE + 64, MEMF_PUBLIC | MEMF_CLEAR);
 
     bug("[PPC.m68k] base pointer %08lx\n", (ULONG)base_pointer);
 
     if (base_pointer)
     {
-        PPCBase = (struct PrivatePPCBase *)((UBYTE *)base_pointer + LIB_NEGSIZE);
+        /* Align base pointer (library base) to 64-byte boundary */
+        ULONG aligned_base = ((ULONG)base_pointer + LIB_NEGSIZE + 63) & ~63;
+        PPCBase = (struct PrivatePPCBase *)aligned_base;
         MakeFunctions(PPCBase, (APTR)relFuncTable, 0);
         
         PPCBase->pp_Public.PPC_LibNode.lib_Node.ln_Type = NT_LIBRARY;
