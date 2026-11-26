@@ -159,6 +159,8 @@ void powerpc_proc()
 
     bug("[PPC.m68k] powerpc.library process\n");
 
+    WaitPort(&self->pr_MsgPort);
+
     /* Get startupt message with PPCBase */
     struct StartupMessage *msg = (struct StartupMessage *)GetMsg(&self->pr_MsgPort);
     struct PrivatePPCBase * PowerPCBase = msg->PPCBase;
