@@ -48,19 +48,38 @@ struct MsgFrame *CreateMsgFrame(struct PrivatePPCBase *PPCBase)
     return u.msgFrame;
 }
 
+/*
+    Get/Send/Free are called from tasks and from the PORTS interrupt server.
+    Make sure they are not disturbed by interrupts.
+*/
 struct MsgFrame* GetMsgFrame(struct PrivatePPCBase* PPCBase)
 {
-    return mf_get(&PPCBase->pp_MFSelf);
+    struct ExecBase *SysBase = PPCBase->pp_Public.PPC_SysLib;
+    struct MsgFrame *msgFrame;
+
+    Disable();
+    msgFrame = mf_get(&PPCBase->pp_MFSelf);
+    Enable();
+
+    return msgFrame;
 }
 
 void SendMsgFrame(struct PrivatePPCBase* PPCBase, struct MsgFrame* msgFrame)
 {
     struct ExecBase *SysBase = PPCBase->pp_Public.PPC_SysLib;
+
+    Disable();
     mf_send(&PPCBase->pp_MFSelf, msgFrame);
+    Enable();
+
     Supervisor(xring_kick_ppc);
 }
 
 void FreeMsgFrame(struct PrivatePPCBase* PPCBase, struct MsgFrame* msgFrame)
 {
+    struct ExecBase *SysBase = PPCBase->pp_Public.PPC_SysLib;
+
+    Disable();
     mf_free(&PPCBase->pp_MFSelf, msgFrame);
+    Enable();
 }
