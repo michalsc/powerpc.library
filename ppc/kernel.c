@@ -128,9 +128,13 @@ void LibBaseSetup(struct PrivatePPCBase *PowerPCBase)
 
 void Start()
 {
-    /* We start in C as soon as possible. Reset MSR to known state first */
+    /* 
+        We start in C as soon as possible. Reset MSR to known state first,
+        do not enable interrupts yet because PowerPCBase is far from ready.
+    */
+
     uint32_t msr = getMSR();
-    setMSR((msr & MSR_IP) | MSR_EE);
+    setMSR(msr & MSR_IP);
 
     /* Reset SPRG0..3 */
     asm volatile("mtsprg0 %0; mtsprg1 %0; mtsprg2 %0; mtsprg3 %0"::"r"(0));
